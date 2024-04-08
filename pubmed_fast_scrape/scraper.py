@@ -9,12 +9,13 @@ import urllib.parse
 from datetime import datetime
 
 class PubMedScraper:
-    def __init__(self, api_key=None, email=None):
+    def __init__(self, api_key='', email="your@email.com"):
         self.api_key = api_key
         self.email = email
         if self.email:
             from Bio import Entrez
             Entrez.email = self.email
+
     def convert_search_terms(self, search_terms):
         """Converts a list of search terms into search-term URL format."""
         # This method remains unchanged.
@@ -39,12 +40,12 @@ class PubMedScraper:
 
         # Format the date in the specified format
         formatted_date = current_date.strftime("%Y/%m/%d")
-        if Entrez.email == False or len(Entrez.email) == 0:
-            Entrez.email = "your.email@example.com"  # Set this to your email
-            print('Warning: No email provided')
-        if api_key == False or len(api_key) == 0:
-            api_key = ''
-            print('Warning: no api key provided')
+        #if Entrez.email == False or len(Entrez.email) == 0:
+            #Entrez.email = "your.email@example.com"  # Set this to your email
+            #print('Warning: No email provided')
+        #if api_key == False or len(api_key) == 0:
+            #api_key = ''
+            #print('Warning: no api key provided')
         handle = Entrez.esearch(db="pubmed", term=topic, retmax=top_n, mindate="2022/01/01", maxdate=formatted_date)
         record = Entrez.read(handle)
         handle.close()
@@ -65,7 +66,7 @@ class PubMedScraper:
 
         return mesh_terms
 
-    def scrape_articles(self, search_terms, year_range, min_citations):
+    def scrape_articles(self, search_terms, year_range, min_citations,api_key='',email='your@email.com'):
         """Scrapes articles based on search terms and year range."""
         # This function will house the bulk of your scraping logic from your original code.
         search_term_string = self.convert_search_terms(search_terms)
