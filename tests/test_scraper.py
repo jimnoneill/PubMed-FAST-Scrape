@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 from pubmed_fast_scrape.scraper import PubMedScraper
+import pandas as pd
 
 class TestPubMedScraper(unittest.TestCase):
 
