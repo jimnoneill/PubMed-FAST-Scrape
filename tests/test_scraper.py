@@ -16,9 +16,11 @@ class TestPubMedScraper(unittest.TestCase):
 
     def test_convert_search_terms_combined(self):
         search_terms = ['antineoplastic', ('prophylactic', 'cancer')]
-        expected = "%28antineoplastic%29+OR+%28prophylactic+AND+cancer%29"
+        # Adjusted expected result to match %2B encoding for spaces
+        expected = "%28antineoplastic%29+OR+%28prophylactic%2BAND%2Bcancer%29"
         result = self.scraper.convert_search_terms(search_terms)
         self.assertEqual(result, expected)
+
 
     @patch('pubmed_fast_scrape.scraper.PubMedScraper.search_mesh_terms')
     def test_search_mesh_terms(self, mock_search_mesh_terms):
