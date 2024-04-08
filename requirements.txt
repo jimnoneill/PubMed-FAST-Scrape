@@ -1,0 +1,7 @@
+requests
+biopython
+beautifulsoup4
+pandas
+lxml
+geonamescache
+pgeocode
