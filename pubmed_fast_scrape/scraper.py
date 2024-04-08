@@ -69,9 +69,11 @@ class PubMedScraper:
 
         return mesh_terms
 
-    def scrape_articles(self, search_terms, year_range, min_citations,api_key='',email='your@email.com'):
+    def scrape_articles(self, field, year_range, min_citations,api_key='',email='your@email.com'):
         """Scrapes articles based on search terms and year range."""
         # This function will house the bulk of your scraping logic from your original code.
+        search_terms = self.search_mesh_terms(field)
+        field = field.replace(" ","_")
         search_term_string = self.convert_search_terms(search_terms)
         articles = []
 
@@ -334,7 +336,7 @@ class PubMedScraper:
 
             # Ensure there are no missing values in 'Citations'
 
-            all_articles_df.to_csv(searching + 'cited_Abstracts_Year_' + str(year) + '.csv', index=False, sep="\t")
+            all_articles_df.to_csv(field + '__' + str(year) + '.csv', index=False, sep="\t")
 
         return all_articles_df
 
