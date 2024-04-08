@@ -7,6 +7,9 @@ from Bio import Entrez
 from collections import Counter
 import urllib.parse
 from datetime import datetime
+from geonamescache import GeonamesCache
+import pgeocode
+import re
 
 class PubMedScraper:
     def __init__(self, api_key='', email="your@email.com"):
@@ -92,7 +95,7 @@ class PubMedScraper:
             numIter = pmidCount//100000 #This is done because the maximum PMIDS for the PubMed API is 100,000
 
             for idx_pmid in range(numIter + 1):
-                url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmax=100000&retstart=' + str(idx_pmid*100000) + '&term=' + searchTerm + ' AND ' + str(year) + '[pdat]&usehistory=y&api_key=' +api_key
+                url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmax=100000&retstart=' + str(idx_pmid*100000) + '&term=' + search_term_string + ' AND ' + str(year) + '[pdat]&usehistory=y&api_key=' +api_key
                 for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
 
                     try:

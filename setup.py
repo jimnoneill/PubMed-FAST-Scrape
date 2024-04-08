@@ -13,6 +13,8 @@ setup(
     install_requires=[
         'requests',
         'biopython',
+        'geonamescache',
+        'pgeocode',
         'beautifulsoup4',  # The package name for bs4 is beautifulsoup4
         'pandas',
         'lxml',  # If you're parsing XML in BeautifulSoup, lxml is highly recommended
