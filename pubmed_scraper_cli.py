@@ -35,7 +35,7 @@ def main():
     results.to_csv(filename, sep="\t", index=False)
     stop = time.time()
 
-    print(f"Results saved to {filename}. Took {stop-start} seconds")
+    print(f"Results saved to {filename}. Took {start-stop} seconds")
 
 if __name__ == "__main__":
     main()
