@@ -4,6 +4,7 @@ from pubmed_fast_scrape.scraper import PubMedScraper
 import pandas
 import os
 import requests
+import time
 
 def main():
     current_year = datetime.now().year
@@ -17,7 +18,7 @@ def main():
     parser.add_argument("--min_citations", type=int, default=1, help="Minimum number of citations for articles to include. Default is 1.")
 
     args = parser.parse_args()
-
+    start = time.time()
     # Initialize the scraper with email and api_key if provided
     scraper = PubMedScraper(email=args.email, api_key=args.api_key)
 
@@ -32,8 +33,9 @@ def main():
 
     # Save the DataFrame to a TSV file
     results.to_csv(filename, sep="\t", index=False)
+    stop = time.time()
 
-    print(f"Results saved to {filename}")
+    print(f"Results saved to {filename}. Took {stop-start} seconds")
 
 if __name__ == "__main__":
     main()

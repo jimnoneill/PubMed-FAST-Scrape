@@ -21,7 +21,6 @@ class PubMedScraper:
 
     def convert_search_terms(self, search_terms):
         """Converts a list of search terms into search-term URL format."""
-        # This method remains unchanged.
         converted_terms = []
 
         for term in search_terms:
@@ -37,19 +36,15 @@ class PubMedScraper:
 
     def search_mesh_terms(self, topic, top_n=10):
         """Grab top 10 MeSH terms for a topic from top 100 articles and filter them by relevance."""
+        from Bio import Entrez
+        from datetime import datetime
+        from collections import Counter
+
         # Get the current date
         current_date = datetime.now()
 
         # Format the date in the specified format
         formatted_date = current_date.strftime("%Y/%m/%d")
-
-        # Ensure email and API key are set (uncomment and modify if needed)
-        # if Entrez.email == False or len(Entrez.email) == 0:
-        #     Entrez.email = "your.email@example.com"
-        #     print('Warning: No email provided')
-        # if api_key == False or len(api_key) == 0:
-        #     api_key = ''
-        #     print('Warning: no api key provided')
 
         handle = Entrez.esearch(db="pubmed", term=topic, retmax=100, mindate="2022/01/01", maxdate=formatted_date)
         record = Entrez.read(handle)
@@ -77,6 +72,9 @@ class PubMedScraper:
 
         # Extract just the terms from the most common terms
         top_mesh_terms = [term for term, count in most_common_terms]
+
+        # Add the topic to the list of MeSH terms
+        top_mesh_terms.append(topic)
 
         return top_mesh_terms
 
@@ -260,7 +258,10 @@ class PubMedScraper:
 
                     for idxa, article in enumerate(pubmedArticles):
                         pubmed_article = PubMedArticle(article)
-                        articles.append(pubmed_article)
+                        if pubmed_article.pmid:
+                            articles.append(pubmed_article)
+                        else:
+                            sys.stderr.write(f"Article missing PMID: {article}\n")
 
         articles_dict_list = [{
             'PMID': article.pmid,
@@ -276,19 +277,26 @@ class PubMedScraper:
             'FundingSources': article.funding_sources,
             'Location': article.location,
             'Email': article.email
-        } for article in articles]
+        } for article in articles if article.pmid]  # Ensure only articles with PMID are included
 
         all_articles_df = pd.DataFrame(articles_dict_list)
+        all_articles_df.to_csv(f'{field}_articles.csv', index=False, sep="\t")
+
+        return all_articles_df
 
 
-        all_articles_df = pd.DataFrame(articles_dict_list)
-        PMID_List = all_articles_df['PMID'].astype(str).tolist()  # Ensure PMIDs are strings
-        PMID_List = [str(i) for i in PMID_List]
-        import requests
-        from requests.adapters import HTTPAdapter
-        from requests.packages.urllib3.util.retry import Retry
-        from bs4 import BeautifulSoup
-        import numpy as np
+# Example usage
+# api_key = 'your_api_key_here'
+# scraper = PubMedScraper(api_key)
+# search_terms = ['antineoplastic', 'anticarcinogenic', ('prophylactic','cancer')]
+#year_range = (2020, 2023)
+# articles = scraper.scrape_articles(search_terms, year_range)
+''' citation stuff
+        #import requests
+        #from requests.adapters import HTTPAdapter
+        #from requests.packages.urllib3.util.retry import Retry
+        #from bs4 import BeautifulSoup
+        #import numpy as np
 
         #def requests_retry_session(retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 504)):
             #session = requests.Session()
@@ -344,15 +352,4 @@ class PubMedScraper:
             #all_articles_df.loc[all_articles_df['PMID'] == pmid, 'Citations'] = citation_count
 
         # Ensure there are no missing values in 'Citations'
-
-        all_articles_df.to_csv(field + '__' + str(year) + '.csv', index=False, sep="\t")
-
-        return all_articles_df
-
-# Example usage
-# api_key = 'your_api_key_here'
-# scraper = PubMedScraper(api_key)
-# search_terms = ['antineoplastic', 'anticarcinogenic', ('prophylactic','cancer')]
-#year_range = (2020, 2023)
-# articles = scraper.scrape_articles(search_terms, year_range)
-
+'''
