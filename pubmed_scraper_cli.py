@@ -3,13 +3,14 @@ from datetime import datetime
 from pubmed_fast_scrape.scraper import PubMedScraper
 import pandas
 import os
+import requests
 
 def main():
     current_year = datetime.now().year
 
     parser = argparse.ArgumentParser(description="PubMed Article Scraper based on field of interest, year range, and minimum citations.")
     parser.add_argument("--email", help="User's email for Entrez queries", required=False)
-    parser.add_argument("--api_key", help="PubMed API key for enhanced rate limit", required=False)
+    parser.add_argument("--api_key", help="PubMed API key for enhanced rate limit", default=False, required=False)
     parser.add_argument("--field", type=str, default="cancer", help="Field of interest for the PubMed search. Default is 'cancer'.")
     parser.add_argument("--start_year", type=int, default=current_year, help=f"Start year for the search range. Default is the current year ({current_year}).")
     parser.add_argument("--end_year", type=int, default=current_year, help=f"End year for the search range. Default is the current year ({current_year}).")
