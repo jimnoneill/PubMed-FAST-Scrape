@@ -34,8 +34,8 @@ class PubMedScraper:
         search_term_string = "+OR+".join(encoded_terms)
         return search_term_string
 
-    def search_mesh_terms(self, topic, top_n=10):
-        """Grab top 10 MeSH terms for a topic from top 100 articles and filter them by relevance."""
+    def search_mesh_terms(self, topic, top_n=5):
+        """Grab top MeSH terms for a topic from top 100 articles and filter them by relevance."""
         current_date = datetime.now()
         formatted_date = current_date.strftime("%Y/%m/%d")
 
@@ -60,9 +60,15 @@ class PubMedScraper:
         term_counts = Counter(mesh_terms)
         most_common_terms = term_counts.most_common(top_n)
         top_mesh_terms = [term for term, count in most_common_terms]
-        top_mesh_terms.append(topic)
 
         return top_mesh_terms
+
+    def create_refined_search_terms(self, main_topic, mesh_terms):
+        """Creates refined search terms by combining the main topic with MeSH terms using AND."""
+        refined_terms = []
+        for term in mesh_terms:
+            refined_terms.append((main_topic, term))
+        return refined_terms
 
     def scrape_articles(self, field, year_range, min_citations, api_key='', email='your@email.com'):
         import requests
@@ -77,9 +83,9 @@ class PubMedScraper:
         import pgeocode
         import re
         import urllib
-
         search_terms = self.search_mesh_terms(field)
-        search_term_string = self.convert_search_terms(search_terms)
+        refined_search_terms = self.create_refined_search_terms(field, search_terms)
+        search_term_string = self.convert_search_terms(refined_search_terms)
         field = field.replace(" ", "_")
 
         columns = ['PMID', 'Abstract', 'ArticleTitle', 'PubDate', 'PubMonth', 'Author', 'KeyWords', 'MeSH', 'Journals', 'Affiliations', 'FundingSources', 'Location', 'Email']

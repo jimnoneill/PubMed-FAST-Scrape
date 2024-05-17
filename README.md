@@ -23,13 +23,14 @@ PubMed-FAST-Scrape can be used as a command-line tool or imported into your Pyth
 To use PubMed-FAST-Scrape from the command line:
 
 ```bash
-pubmed-fast-scrape --field "Cancer Research" --start_year 2010 --end_year 2020 --min_citations 1
+pubmed-fast-scrape --field "Cancer Research" --start_year 2010 --end_year 2020
 ```
 # In Python Scripts
 ```python
 from pubmed_fast_scrape.scraper import PubMedScraper
 
-scraper = PubMedScraper(email='email_not_required@makesitfaster.com', api_key='your_api_key_not-required-but-makes-it-faster')
+Note: currently API keys are not supported
+scraper = PubMedScraper(email='email_not_required@makesitfaster.com')
 results = scraper.scrape('Cancer Research', (2023, 2024), 1) # field, year range, n-min citations
 
 results.head()
