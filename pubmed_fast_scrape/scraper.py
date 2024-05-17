@@ -40,14 +40,14 @@ class PubMedScraper:
         formatted_date = current_date.strftime("%Y/%m/%d")
 
         handle = Entrez.esearch(db="pubmed", term=topic, retmax=100, mindate="2022/01/01", maxdate=formatted_date)
-        record = Entrez.read(handle)
+        record = Entrez.read(handle, validate=False)  # Add validate=False
         handle.close()
         pubmed_ids = record["IdList"]
 
         mesh_terms = []
         for pubmed_id in pubmed_ids:
             handle = Entrez.efetch(db="pubmed", id=pubmed_id, retmode="xml")
-            records = Entrez.read(handle)
+            records = Entrez.read(handle, validate=False)  # Add validate=False
             handle.close()
 
             if "PubmedArticle" in records:
