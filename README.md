@@ -29,7 +29,6 @@ pubmed-fast-scrape --field "Cancer Research" --start_year 2010 --end_year 2020
 ```python
 from pubmed_fast_scrape.scraper import PubMedScraper
 
-Note: currently API keys are not supported
 scraper = PubMedScraper(email='email_not_required@makesitfaster.com')
 results = scraper.scrape('Cancer Research', (2023, 2024), 1) # field, year range, n-min citations
 
