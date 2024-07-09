@@ -23,7 +23,7 @@ PubMed-FAST-Scrape can be used as a command-line tool or imported into your Pyth
 To use PubMed-FAST-Scrape from the command line:
 
 ```bash
-pubmed-fast-scrape --field "Cancer Research" --start_year 2010 --end_year 2020
+python3 pubmed_scraper_cli.py --field "Cancer Research" --start_year 2010 --end_year 2020
 ```
 # In Python Scripts
 ```python
