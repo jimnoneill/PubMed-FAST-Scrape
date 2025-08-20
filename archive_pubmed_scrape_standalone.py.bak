@@ -11,10 +11,10 @@ import re
 import urllib
 import os
 import asyncio
-import aiohttp
+import aiohttp  # Asynchronous HTTP requests
 from aiohttp import ClientSession
-from asyncio_throttle import Throttler
-import math
+from asyncio_throttle import Throttler  # To implement rate limiting
+import math  # Added for ceil function
 
 class PubMedArticle:
     nomi = pgeocode.Nominatim('us')
@@ -33,7 +33,7 @@ class PubMedArticle:
         self.affiliations = self.get_joined_text(article, 'Affiliation')
         self.funding_sources = self.get_funding_sources(article)
         self.location = self.get_location(article)
-        self.email_addresses = self.get_email(article)
+        self.email = self.get_email(article)
         self.authors_info = self.get_authors(article)
 
     @staticmethod
@@ -128,7 +128,7 @@ class PubMedArticle:
             'Accept': 'application/pdf',
             'Accept-Language': 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'email': self.email
+            'email': self.email  # Replace with your email
         }
         pdf_path = os.path.join(save_dir, f'{self.pmid}.pdf')
         # Check if PDF already exists
@@ -149,6 +149,7 @@ class PubMedArticle:
                         else:
                             return
                 except Exception as e:
+                    #sys.stderr.write(f'Error downloading PDF for PMID {self.pmid}: {e}\n')
                     if i == 5:
                         return
                     await asyncio.sleep(3 * (i - 1))
@@ -187,6 +188,7 @@ class PubMedArticle:
                         else:
                             return None
                 except Exception as e:
+                    #sys.stderr.write(f'Error retrieving PMC ID for PMID {self.pmid}: {e}\n')
                     if i == 5:
                         return None
                     await asyncio.sleep(3 * (i - 1))
@@ -195,7 +197,7 @@ class PubMedArticle:
 
 class PubMedScraper:
 
-    def __init__(self, api_key='', email="your@email.com"):
+    def __init__(self, api_key='', email="your.email@example.com"):
         self.api_key = api_key
         self.email = email
         if self.email:
@@ -383,36 +385,11 @@ class PubMedScraper:
 
         return all_pmids
 
-    async def download_pdfs_async(self, articles, save_dir):
-        # Limit to N requests per second (e.g., 10 requests per second with API key)
-        max_requests_per_second = 9  # Set to 9 to stay within the limit
-        throttler = Throttler(rate_limit=max_requests_per_second)
-        connector = aiohttp.TCPConnector(limit=10)  # Limit the number of connections
-
-        async with ClientSession(connector=connector) as session:
-            tasks = []
-            for article in articles:
-                if not article.abstract.strip():
-                    task = asyncio.ensure_future(article.download_pdf(save_dir, session, throttler))
-                    tasks.append(task)
-            await asyncio.gather(*tasks)
-
-    def scrape_articles(self, field, year_range, search_term_string=None, keywords=None, min_citations=0, download_pdfs=False):
-        if min_citations > 0:
-            print(f"Warning: min_citations filtering is not yet implemented. All articles will be returned.")
-        
-        # Build search term
+    def scrape_articles(self, field, year_range, search_term_string=False, min_citations=0, citations=True):
         if not search_term_string:
-            # If keywords provided, use them instead of MeSH terms
-            if keywords:
-                # Parse keywords and create search string
-                keyword_list = [k.strip() for k in keywords.split(',')]
-                search_terms = [field] + keyword_list
-                search_term_string = self.convert_search_terms(search_terms)
-            else:
-                # Use simple field search without MeSH refinement
-                search_term_string = urllib.parse.quote(field)
-        
+            search_terms = self.search_mesh_terms(field)
+            refined_search_terms = self.create_refined_search_terms(field, search_terms)
+            search_term_string = self.convert_search_terms(refined_search_terms)
         field_filename = field.replace(" ", "_")
 
         columns = ['PMID', 'Abstract', 'ArticleTitle', 'PubDate', 'PubMonth', 'Author', 'AuthorORCID', 'KeyWords',
@@ -466,60 +443,253 @@ class PubMedScraper:
                     except Exception as e:
                         print(f"Error fetching chunk {i+1}: {e}")
                         if attempt == 5:
-                                break
+                            break
                         time.sleep(3 * attempt)
 
                 if response.status_code != 200:
                     print(f"Failed to fetch details for chunk {i+1}, skipping...")
-                                continue
+                    continue
 
                 soup = BeautifulSoup(response.content, 'lxml-xml')
                 pubmed_articles = soup.find_all('PubmedArticle')
 
                 for article in pubmed_articles:
                     pubmed_article = PubMedArticle(article, api_key=self.api_key, email=self.email)
-                        if pubmed_article.pmid:
-                            articles.append(pubmed_article)
+                    if pubmed_article.pmid:
+                        articles.append(pubmed_article)
 
                 # Avoid overwhelming the server
                 time.sleep(1)
 
             print(f"Year {year}: Processing {len(articles)} articles.")
 
-            # Download PDFs if requested
-            if download_pdfs:
-                # Prepare directory for PDFs
-                save_dir = f'{field_filename}_pdfs/{year}/'
-                os.makedirs(save_dir, exist_ok=True)
+            # Prepare directory for PDFs
+            save_dir = f'{field_filename}_pdfs/{year}/'
+            os.makedirs(save_dir, exist_ok=True)
 
-                # Download PDFs asynchronously for articles without abstracts
-                asyncio.run(self.download_pdfs_async(articles, save_dir))
+            # Download PDFs asynchronously for articles without abstracts
+            asyncio.run(self.download_pdfs_async(articles, save_dir))
 
             # Convert articles to dictionary list for DataFrame
-                articles_dict_list = [{
-                    'PMID': article.pmid,
-                    'Abstract': article.abstract,
-                    'ArticleTitle': article.article_title,
-                    'PubDate': article.pub_date_year,
-                    'PubMonth': article.pub_date_month,
-                    'Author': ';'.join([author['Name'] for author in article.authors_info]),
-                    'AuthorORCID': ';'.join([author['ORCID'] for author in article.authors_info]),
-                    'KeyWords': article.keywords,
-                    'MeSH': article.mesh_terms,
-                    'Journals': article.journal,
-                    'Affiliations': article.affiliations,
-                    'FundingSources': article.funding_sources,
-                    'Location': article.location,
-                'Email': article.email_addresses
-                } for article in articles]
+            articles_dict_list = [{
+                'PMID': article.pmid,
+                'Abstract': article.abstract,
+                'ArticleTitle': article.article_title,
+                'PubDate': article.pub_date_year,
+                'PubMonth': article.pub_date_month,
+                'Author': ';'.join([author['Name'] for author in article.authors_info]),
+                'AuthorORCID': ';'.join([author['ORCID'] for author in article.authors_info]),
+                'KeyWords': article.keywords,
+                'MeSH': article.mesh_terms,
+                'Journals': article.journal,
+                'Affiliations': article.affiliations,
+                'FundingSources': article.funding_sources,
+                'Location': article.location,
+                'Email': article.email
+            } for article in articles]
 
             # Add this year's articles to the master DataFrame
-                articles_df = pd.DataFrame(articles_dict_list)
-                all_articles_df = pd.concat([all_articles_df, articles_df], ignore_index=True)
+            articles_df = pd.DataFrame(articles_dict_list)
+            all_articles_df = pd.concat([all_articles_df, articles_df], ignore_index=True)
 
         # Save the complete dataset
         output_file = f'{field_filename}_articles_{year_range[0]}-{year_range[1]}.tsv'
         all_articles_df.to_csv(output_file, index=False, sep="\t")
         print(f"Saved all articles to {output_file}")
 
-        return all_articles_df
+    async def download_pdfs_async(self, articles, save_dir):
+        # Limit to N requests per second (e.g., 10 requests per second with API key)
+        max_requests_per_second = 9  # Set to 9 to stay within the limit
+        throttler = Throttler(rate_limit=max_requests_per_second)
+        connector = aiohttp.TCPConnector(limit=10)  # Limit the number of connections
+
+        async with ClientSession(connector=connector) as session:
+            tasks = []
+            for article in articles:
+                if not article.abstract.strip():
+                    task = asyncio.ensure_future(article.download_pdf(save_dir, session, throttler))
+                    tasks.append(task)
+            await asyncio.gather(*tasks)
+
+# Your search terms and fields
+search_term_strings = [
+'%28%28%22Healthcare%20Disparities%22%5BMeSH%5D%20OR%20%22Health%20Equity%22%5BMeSH%5D%20OR%20%22Social%20Determinants%20of%20Health%22%5BMeSH%5D%20OR%20%22Socioeconomic%20Factors%22%5BMeSH%5D%20OR%20%22Minority%20Groups%22%5BMeSH%5D%29%20OR%20%28%22health%20disparity%22%20OR%20%22health%20disparities%22%20OR%20%22healthcare%20disparity%22%20OR%20%22healthcare%20disparities%22%20OR%20%22health%20inequality%22%20OR%20%22health%20inequalities%22%20OR%20%22health%20inequity%22%20OR%20%22health%20inequities%22%20OR%20%22medical%20disparity%22%20OR%20%22medical%20disparities%22%20OR%20%22racial%20disparity%22%20OR%20%22ethnic%20disparity%22%20OR%20%22health%20gap%22%20OR%20%22health%20gaps%22%20OR%20%22health%20divide%22%20OR%20%22unequal%20health%22%20OR%20disparit*%20OR%20inequal*%20OR%20inequit*%29%29']
+
+#     # COPD causes / risk factors / etiology
+#     '%28%28%22Pulmonary%20Disease%2C%20Chronic%20Obstructive%2Fetiology%22%5BMeSH%5D%20OR%20%22Pulmonary%20Disease%2C%20Chronic%20Obstructive%2Fepidemiology%22%5BMeSH%5D%20OR%20%22Risk%20Factors%22%5BMeSH%5D%20OR%20%22Smoking%22%5BMeSH%5D%20OR%20%22Air%20Pollution%22%5BMeSH%5D%20OR%20%22Occupational%20Exposure%22%5BMeSH%5D%29%20OR%20%28%22COPD%20cause%22%20OR%20%22COPD%20causes%22%20OR%20%22chronic%20obstructive%20pulmonary%20disease%20cause%22%20OR%20%22risk%20factor%22%20OR%20%22risk%20factors%22%20OR%20etiolog*%20OR%20pathogenesis%20OR%20%22smoking%22%20OR%20%22air%20pollution%22%20OR%20%22occupational%20exposure%22%20OR%20%22genetic%20susceptibility%22%29%29',
+#
+#     # COPD treatments / management
+#     '%28%28%22Pulmonary%20Disease%2C%20Chronic%20Obstructive%2Ftherapy%22%5BMeSH%5D%20OR%20%22Pulmonary%20Disease%2C%20Chronic%20Obstructive%2Fdrug%20therapy%22%5BMeSH%5D%20OR%20%22Bronchodilator%20Agents%22%5BMeSH%5D%20OR%20%22Corticosteroids%22%5BMeSH%5D%20OR%20%22Pulmonary%20Rehabilitation%22%5BMeSH%5D%20OR%20%22Respiratory%20Therapy%22%5BMeSH%5D%20OR%20%22Oxygen%20Inhalation%20Therapy%22%5BMeSH%5D%20OR%20%22Anti-Inflammatory%20Agents%2C%20Inhaled%22%5BMeSH%5D%29%20OR%20%28%22COPD%20treatment%22%20OR%20%22COPD%20therapy%22%20OR%20%22bronchodilator%22%20OR%20%22inhaled%20corticosteroid%22%20OR%20%22ICS%22%20OR%20%22LABA%22%20OR%20%22LAMA%22%20OR%20%22triple%20therapy%22%20OR%20%22pulmonary%20rehabilitation%22%20OR%20%22oxygen%20therapy%22%20OR%20%22non-invasive%20ventilation%22%20OR%20%22disease%20management%22%20OR%20%22exacerbation%20prevention%22%29%29'
+# ]
+
+fields = ['health_disparities_null']#['copd_causes', 'copd_treatments']
+
+year_range = (2018, 2019)
+
+scraper = PubMedScraper(api_key='c86f8d8b826a45dde1b09354bb6b4506d808', email='jimnoneill@orcid')
+# scraper = PubMedScraper(api_key='cef5171ce6da1a2b0a3104bdb41660de3308',email='jnoneill@formerstudents.ucdavis.edu')
+
+min_citations = 0
+
+# Loop over the lists
+for field, search_term_string in zip(fields, search_term_strings):
+    print(f"Processing field: {field} with search term: {search_term_string}")
+    scraper.scrape_articles(field, year_range, search_term_string)
+    print(f"Completed processing for field: {field}")
+
+### Extract abstracts and titles from missingno
+
+import os
+import glob
+import pandas as pd
+import re
+import fitz  # Explicit import
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
+import csv
+
+def extract_text_from_pdf(pdf_path):
+    try:
+        with fitz.open(pdf_path) as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()
+        return text
+    except Exception as e:
+        print(f"Error extracting text from {pdf_path}: {e}")
+        return ""
+
+def parse_abstract_and_title(pdf_text):
+    # Preprocess text
+    pdf_text = re.sub(r'\s+', ' ', pdf_text)
+
+    # Initialize title and abstract
+    title = ''
+    abstract = ''
+
+    # Attempt to extract the title (assuming it's before 'Abstract' or similar headings)
+    title_pattern = re.compile(r'^(.*?)\s*(?=Abstract|ABSTRACT|Introduction|INTRODUCTION|Background|BACKGROUND)', re.DOTALL)
+    title_match = title_pattern.search(pdf_text)
+    if title_match:
+        title = title_match.group(1).strip()
+    else:
+        # Fallback: Use the first 100 characters
+        title = pdf_text[:100].strip()
+
+    # Attempt to find the abstract
+    abstract_pattern = re.compile(r'(?i)(Abstract|Summary)\s*[:.-]*\s*(.*?)(?=(Introduction|Background|Methods|Materials and Methods|Objective|Aim|Patients and Methods|Results))', re.DOTALL)
+    abstract_match = abstract_pattern.search(pdf_text)
+    if abstract_match:
+        abstract = abstract_match.group(2).strip()
+    else:
+        # Fallback: Use the text after the title up to the next heading
+        abstract = pdf_text[len(title):].split('Introduction', 1)[0].strip()
+
+    return title, abstract
+
+def process_pdf(args):
+    pdf_file, pmid = args
+    result = {'PMID': pmid, 'Abstract': None, 'ArticleTitle': None}
+
+    pdf_text = extract_text_from_pdf(pdf_file)
+    if not pdf_text.strip():
+        return result  # Empty PDF or extraction failed
+
+    title, abstract = parse_abstract_and_title(pdf_text)
+
+    if abstract:
+        result['Abstract'] = abstract
+    if title:
+        result['ArticleTitle'] = title
+
+    return result
+
+def update_tsv_with_pdf_data(field, year_range):
+    field_filename = field.replace(" ", "_")
+    tsv_filename = f'{field_filename}_articles_{year_range[0]}-{year_range[1]}.tsv'
+    if not os.path.exists(tsv_filename):
+        print(f"TSV file {tsv_filename} not found.")
+        return
+
+    # Read the TSV file into a DataFrame
+    df = pd.read_csv(tsv_filename, sep='\t', dtype={'PMID': str}, low_memory=False)
+
+    # Drop duplicates based on PMID
+    df.drop_duplicates(subset='PMID', inplace=True)
+
+    # Filter PMIDs with missing abstracts or titles
+    missing_abstracts = df['Abstract'].isna() | df['Abstract'].str.strip().eq('')
+    missing_titles = df['ArticleTitle'].isna() | df['ArticleTitle'].str.strip().eq('')
+    df_missing = df[missing_abstracts | missing_titles].copy()
+
+    if df_missing.empty:
+        print("No missing abstracts or titles to update.")
+        return
+
+    # Create a set of PMIDs that need updates
+    pmids_to_update = set(df_missing['PMID'])
+
+    # Prepare tasks for multiprocessing
+    tasks = []
+
+    # Process each year folder
+    pdf_folder = f'{field_filename}_pdfs'
+
+    if not os.path.exists(pdf_folder):
+        print(f"PDF folder {pdf_folder} not found.")
+        return
+
+    for year in range(int(year_range[0]), int(year_range[1]) + 1):
+        year_folder = os.path.join(pdf_folder, str(year))
+        if not os.path.exists(year_folder):
+            continue  # No PDFs for this year
+
+        pdf_files = glob.glob(os.path.join(year_folder, '*.pdf'))
+        if not pdf_files:
+            continue
+
+        for pdf_file in pdf_files:
+            pmid = os.path.splitext(os.path.basename(pdf_file))[0]
+            if pmid in pmids_to_update:
+                tasks.append((pdf_file, pmid))
+
+    if not tasks:
+        print("No matching PDFs found for missing PMIDs.")
+        return
+
+    print(f"Processing {len(tasks)} PDFs for field '{field}'...")
+
+    # Use multiprocessing Pool to process PDFs in parallel
+    num_workers = max(1, cpu_count() - 1)  # Leave one CPU free
+    with Pool(processes=num_workers) as pool:
+        results = list(tqdm(pool.imap_unordered(process_pdf, tasks), total=len(tasks)))
+
+    # Create a DataFrame from results
+    results_df = pd.DataFrame(results)
+
+    # Drop duplicates in results_df
+    results_df.drop_duplicates(subset='PMID', inplace=True)
+
+    # Merge the results with the original DataFrame
+    df = df.merge(results_df, on='PMID', how='left', suffixes=('', '_new'))
+
+    # Update the 'Abstract' and 'ArticleTitle' columns with new data
+    df['Abstract'] = df['Abstract'].fillna(df['Abstract_new'])
+    df['ArticleTitle'] = df['ArticleTitle'].fillna(df['ArticleTitle_new'])
+
+    # Drop the auxiliary columns
+    df.drop(columns=['Abstract_new', 'ArticleTitle_new'], inplace=True)
+
+    # Save the updated DataFrame back to TSV with escape character
+    df.to_csv(tsv_filename, sep='\t', index=False, quoting=csv.QUOTE_NONE, escapechar='\\')
+
+    print(f"Updated TSV file saved: {tsv_filename}")
+
+if __name__ == '__main__':
+    fields = ['health_disparies_null']#['copd_causes', 'copd_treatments']
+    year_range = (2018, 2019)
+
+    for field in fields:
+        print(f"Updating TSV for field: {field}")
+        update_tsv_with_pdf_data(field, year_range)
+        print(f"Completed updating TSV for field: {field}\n")
