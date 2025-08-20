@@ -471,15 +471,15 @@ class PubMedScraper:
 
                 if response.status_code != 200:
                     print(f"Failed to fetch details for chunk {i+1}, skipping...")
-                                continue
+                    continue
 
                 soup = BeautifulSoup(response.content, 'lxml-xml')
                 pubmed_articles = soup.find_all('PubmedArticle')
 
                 for article in pubmed_articles:
                     pubmed_article = PubMedArticle(article, api_key=self.api_key, email=self.email)
-                        if pubmed_article.pmid:
-                            articles.append(pubmed_article)
+                    if pubmed_article.pmid:
+                        articles.append(pubmed_article)
 
                 # Avoid overwhelming the server
                 time.sleep(1)
